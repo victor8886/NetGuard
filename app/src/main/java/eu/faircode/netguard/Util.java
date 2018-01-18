@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.Manifest;
@@ -31,7 +31,10 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
@@ -127,7 +130,11 @@ public class Util {
     private static native boolean is_numeric_address(String ip);
 
     static {
-        System.loadLibrary("netguard");
+        try {
+            System.loadLibrary("netguard");
+        } catch (UnsatisfiedLinkError ignored) {
+            System.exit(1);
+        }
     }
 
     public static String getSelfVersionName(Context context) {
@@ -408,12 +415,35 @@ public class Util {
     }
 
     public static boolean isPlayStoreInstall(Context context) {
-        return "com.android.vending".equals(context.getPackageManager().getInstallerPackageName(context.getPackageName()));
+        try {
+            return "com.android.vending".equals(context.getPackageManager().getInstallerPackageName(context.getPackageName()));
+        } catch (Throwable ex) {
+            Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
+            return false;
+        }
     }
 
     public static boolean hasPlayServices(Context context) {
         GoogleApiAvailability api = GoogleApiAvailability.getInstance();
         return (api.isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS);
+    }
+
+    public static boolean hasXposed(Context context) {
+        if (!isPlayStoreInstall(context))
+            return false;
+        for (StackTraceElement ste : Thread.currentThread().getStackTrace())
+            if (ste.getClassName().startsWith("de.robv.android.xposed"))
+                return true;
+        return false;
+    }
+
+    public static boolean ownFault(Context context, Throwable ex) {
+        if (ex.getCause() != null)
+            ex = ex.getCause();
+        for (StackTraceElement ste : ex.getStackTrace())
+            if (ste.getClassName().startsWith(context.getPackageName()))
+                return true;
+        return false;
     }
 
     public static String getFingerprint(Context context) {
@@ -470,6 +500,35 @@ public class Util {
 
     public static int dips2pixels(int dips, Context context) {
         return Math.round(dips * context.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static int calculateInSampleSize(
+            BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        int height = options.outHeight;
+        int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+            int halfHeight = height / 2;
+            int halfWidth = width / 2;
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth)
+                inSampleSize *= 2;
+        }
+
+        return inSampleSize;
+    }
+
+    public static Bitmap decodeSampledBitmapFromResource(
+            Resources resources, int resourceId, int reqWidth, int reqHeight) {
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeResource(resources, resourceId, options);
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+        options.inJustDecodeBounds = false;
+
+        return BitmapFactory.decodeResource(resources, resourceId, options);
     }
 
     public static String getProtocolName(int protocol, int version, boolean brief) {

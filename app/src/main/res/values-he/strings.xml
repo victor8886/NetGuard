@@ -3,8 +3,9 @@
 <resources>
   <string name="app_description">NetGuard מספקת דרכים פשוטות ומתקדמות לחסום גישה לאינטרנט - ללא צורך ברוט
 היא מאפשרת לחסום או לאפשר באופן פרטני גישת יישומים לרשתות Wi-Fi או אינטרנט סלולרי.</string>
-  <string name="app_copyright">זכויות יוצרים \u00A9 2015–2017 על ידי מ Bokhorst (M66B)</string>
-  <string name="app_android">NetGuard דורש אנדרואיד 4.0 ואילך</string>
+  <string name="app_copyright">זכויות יוצרים \u00A9 2015–2018 על ידי מ Bokhorst (M66B)</string>
+  <string name="app_android">NetGuard requires Android 5.1 or later</string>
+  <string name="app_xposed">Xposed causes too many crashes, which might result in NetGuard being removed from the Google Play Store, therefore NetGuard isn\'t supported while Xposed is installed</string>
   <string name="app_license">על ידי שימוש NetGuard, אתה מסכים <a href="http://www.gnu.org/licenses/gpl.txt"> הרישיון הציבורי הכללי של גנו גרסה 3</a></string>
   <string name="app_privacy"><a href="https://www.netguard.me/privacy/">Privacy policy</a></string>
   <string name="app_first">תשומת לב רבה הוקדשה כדי לפתח ולבדוק את NetGuard, אך זה בלתי אפשרי להבטיח ש-NetGuard תפעל כראוי על כל מכשיר. שימוש בNetGuard מהווה הסכמה לתנאי \n\n <a href="http://www.gnu.org/licenses/gpl.txt"> הרישיון הציבורי הכללי של גנו גרסה 3</a></string>
@@ -199,6 +200,7 @@
   <string name="msg_vpn_cancelled">VPN connection cancelled\nDid you configure another VPN to be an always-on VPN?</string>
   <string name="msg_on">Powering down your device with NetGuard enabled, will automatically start NetGuard on powering up your device</string>
   <string name="msg_unavailable">This feature is not available on this Android version</string>
+  <string name="msg_always_on">Another VPN is set as Always-on VPN</string>
   <string name="title_lockdown_enabled">Traffic is locked down</string>
   <string name="title_unmetered_allowed">תעבורה חופשית מאופשרת</string>
   <string name="title_unmetered_blocked">תעבורה חופשית חסומה</string>
@@ -247,6 +249,7 @@
   <string name="title_dontask">אל תשאל שוב</string>
   <string name="title_log_whois">Whois %1$s</string>
   <string name="title_log_port">פורט %1$d</string>
+  <string name="title_log_copy">Copy</string>
   <string name="title_pro">מאפייני גירסת Pro</string>
   <string name="title_pro_description">התכונות הבאות זמינות בגירסת Pro:</string>
   <string name="title_pro_log">צפה ביומן התעבורה החסומה</string>

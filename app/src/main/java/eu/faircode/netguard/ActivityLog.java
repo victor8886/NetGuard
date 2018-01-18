@@ -16,9 +16,11 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -265,6 +267,12 @@ public class ActivityLog extends AppCompatActivity implements SharedPreferences.
                                     startActivity(new Intent(ActivityLog.this, ActivityPro.class));
                                 return true;
 
+                            case R.id.menu_copy:
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                                ClipData clip = ClipData.newPlainText("netguard", dname == null ? daddr : dname);
+                                clipboard.setPrimaryClip(clip);
+                                return true;
+
                             default:
                                 return false;
                         }
@@ -335,7 +343,7 @@ public class ActivityLog extends AppCompatActivity implements SharedPreferences.
                 if (query != null && query.length() > 0) {
                     for (Rule rule : Rule.getRules(true, ActivityLog.this))
                         if (rule.name != null && rule.name.toLowerCase().contains(query.toLowerCase())) {
-                            String newQuery = Integer.toString(rule.info.applicationInfo.uid);
+                            String newQuery = Integer.toString(rule.uid);
                             Log.i(TAG, "Search " + query + " found " + rule.name + " new " + newQuery);
                             return newQuery;
                         }

@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.content.DialogInterface;
@@ -192,7 +192,7 @@ public class ActivityForwarding extends AppCompatActivity {
                                     final int dport = Integer.parseInt(etDPort.getText().toString());
                                     final String raddr = etRAddr.getText().toString();
                                     final int rport = Integer.parseInt(etRPort.getText().toString());
-                                    final int ruid = ((Rule) spRuid.getSelectedItem()).info.applicationInfo.uid;
+                                    final int ruid = ((Rule) spRuid.getSelectedItem()).uid;
 
                                     InetAddress iraddr = InetAddress.getByName(raddr);
                                     if (rport < 1024 && (iraddr.isLoopbackAddress() || iraddr.isAnyLocalAddress()))

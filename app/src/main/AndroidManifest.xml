@@ -11,6 +11,7 @@
     <uses-permission android:name="com.android.vending.BILLING" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- http://developer.android.com/guide/topics/security/permissions.html#normal-dangerous -->
 
     <permission
@@ -57,6 +58,9 @@
         <meta-data
             android:name="firebase_analytics_collection_deactivated"
             android:value="true" />
+        <meta-data
+            android:name="firebase_crash_collection_enabled"
+            android:value="false" />
         <meta-data
             android:name="android.max_aspect"
             android:value="2.1" />
@@ -219,11 +223,18 @@
         </service>
 
         <receiver
-            android:name=".Receiver"
+            android:name=".ReceiverAutostart"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".ReceiverPackageRemoved">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <data android:scheme="package" />
             </intent-filter>
         </receiver>
 

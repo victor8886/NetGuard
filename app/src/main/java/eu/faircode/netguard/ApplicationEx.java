@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.annotation.TargetApi;
@@ -46,9 +46,14 @@ public class ApplicationEx extends Application {
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread thread, Throwable ex) {
-                Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-                if (mPrevHandler != null)
+                if (Util.ownFault(ApplicationEx.this, ex)
+                        && Util.isPlayStoreInstall(ApplicationEx.this)) {
+                    Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
                     mPrevHandler.uncaughtException(thread, ex);
+                } else {
+                    Log.w(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
+                    System.exit(1);
+                }
             }
         });
     }

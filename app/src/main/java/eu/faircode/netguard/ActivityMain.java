@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.content.BroadcastReceiver;
@@ -50,6 +50,7 @@ import android.support.v7.widget.SwitchCompat;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ImageSpan;
 import android.text.style.UnderlineSpan;
@@ -102,7 +103,7 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
     private static final int REQUEST_LOGCAT = 3;
     public static final int REQUEST_ROAMING = 4;
 
-    private static final int MIN_SDK = Build.VERSION_CODES.ICE_CREAM_SANDWICH;
+    private static final int MIN_SDK = Build.VERSION_CODES.LOLLIPOP_MR1;
 
     public static final String ACTION_RULES_CHANGED = "eu.faircode.netguard.ACTION_RULES_CHANGED";
     public static final String ACTION_QUEUE_CHANGED = "eu.faircode.netguard.ACTION_QUEUE_CHANGED";
@@ -120,9 +121,19 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
         Log.i(TAG, "Create version=" + Util.getSelfVersionName(this) + "/" + Util.getSelfVersionCode(this));
         Util.logExtras(getIntent());
 
+        // Check minimum Android version
         if (Build.VERSION.SDK_INT < MIN_SDK) {
+            Log.i(TAG, "SDK=" + Build.VERSION.SDK_INT);
             super.onCreate(savedInstanceState);
             setContentView(R.layout.android);
+            return;
+        }
+
+        // Check for Xposed
+        if (Util.hasXposed(this)) {
+            Log.i(TAG, "Xposed running");
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.xposed);
             return;
         }
 
@@ -137,7 +148,7 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
         boolean initialized = prefs.getBoolean("initialized", false);
 
         // Upgrade
-        Receiver.upgrade(initialized, this);
+        ReceiverAutostart.upgrade(initialized, this);
 
         if (!getIntent().hasExtra(EXTRA_APPROVE)) {
             if (enabled)
@@ -189,6 +200,14 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
                 prefs.edit().putBoolean("enabled", isChecked).apply();
 
                 if (isChecked) {
+                    String alwaysOn = Settings.Secure.getString(getContentResolver(), "always_on_vpn_app");
+                    Log.i(TAG, "Always-on=" + alwaysOn);
+                    if (!TextUtils.isEmpty(alwaysOn) && !getPackageName().equals(alwaysOn)) {
+                        swEnabled.setChecked(false);
+                        Toast.makeText(ActivityMain.this, R.string.msg_always_on, Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
                     try {
                         final Intent prepare = VpnService.prepare(ActivityMain.this);
                         if (prepare == null) {
@@ -407,6 +426,9 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
         Util.logExtras(intent);
         super.onNewIntent(intent);
 
+        if (Build.VERSION.SDK_INT < MIN_SDK || Util.hasXposed(this))
+            return;
+
         setIntent(intent);
 
         if (Build.VERSION.SDK_INT >= MIN_SDK) {
@@ -421,6 +443,11 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
     @Override
     protected void onResume() {
         Log.i(TAG, "Resume");
+
+        if (Build.VERSION.SDK_INT < MIN_SDK || Util.hasXposed(this)) {
+            super.onResume();
+            return;
+        }
 
         DatabaseHelper.getInstance(this).addAccessChangedListener(accessChangedListener);
         if (adapter != null)
@@ -440,6 +467,9 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
         Log.i(TAG, "Pause");
         super.onPause();
 
+        if (Build.VERSION.SDK_INT < MIN_SDK || Util.hasXposed(this))
+            return;
+
         DatabaseHelper.getInstance(this).removeAccessChangedListener(accessChangedListener);
 
         disableAds();
@@ -450,6 +480,9 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
         Log.i(TAG, "Config");
         super.onConfigurationChanged(newConfig);
 
+        if (Build.VERSION.SDK_INT < MIN_SDK || Util.hasXposed(this))
+            return;
+
         disableAds();
         if (!IAB.isPurchasedAny(this) && Util.hasPlayServices(this))
             enableAds();
@@ -459,7 +492,7 @@ public class ActivityMain extends AppCompatActivity implements SharedPreferences
     public void onDestroy() {
         Log.i(TAG, "Destroy");
 
-        if (Build.VERSION.SDK_INT < MIN_SDK) {
+        if (Build.VERSION.SDK_INT < MIN_SDK || Util.hasXposed(this)) {
             super.onDestroy();
             return;
         }

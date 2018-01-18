@@ -28,7 +28,8 @@ The firewall can only start when Android "allows" it to start,
 so it will not offer protection during early boot-up (although you can disable your network before rebooting).
 It will, however, be much better than nothing.
 
-Android N allows NetGuard to be an [Always-On VPN](https://developer.android.com/preview/features/afw.html#always-on-vpn).
+Android N and later allows NetGuard to be an [Always-On VPN](https://developer.android.com/preview/features/afw.html#always-on-vpn).
+On Android O do not enable '*Block connections without VPN*', see [question 51](#FAQ51)) for more information on this.
 
 To protect yourself more, remember to disable Wi-Fi and mobile data before rebooting,
 and only enable them on reboot, after the firewall service has started (and the key icon is visible in the status bar).
@@ -47,9 +48,7 @@ However, NetGuard supports a [SOCKS5 proxy](https://en.wikipedia.org/wiki/SOCKS)
 <a name="FAQ3"></a>
 **(3) Can I use NetGuard on any Android version?**
 
-No, the minimum required Android version is 4.0 (<a href= "https://developer.android.com/about/versions/android-4.0.html">ICE_CREAM_SANDWICH</a>)
-because NetGuard uses the [Android VPN service](https://developer.android.com/reference/android/net/VpnService.html),
-which was added in Android 4.0.
+No, the minimum required Android version is 5.1 (<a href= "https://developer.android.com/about/versions/android-5.1.html">LOLLIPOP</a>)
 
 <a name="FAQ4"></a>
 **(4) Will NetGuard use extra battery power?**
@@ -141,8 +140,8 @@ To avoid this problem, at least temporarily, close all applications and/or servi
 <a name="FAQ15"></a>
 **(15) Why won't you support the F-Droid builds?**
 
-Because F-Droid doesn't support reproducible builds.
-Read [here](https://blog.torproject.org/blog/deterministic-builds-part-one-cyberwar-and-global-compromise) why this is important.
+NetGuard contains ads since a while, because very few people support the NetGuard project in other ways.
+This means NetGuard will not be accepted by F-Droid.
 
 Another reason is that F-Droid builds are more often than not outdated, leaving users with an old version with known bugs.
 
@@ -161,7 +160,7 @@ and is incorrectly attributed to NetGuard instead to the Google Play™ store ap
 <a name="FAQ18"></a>
 **(18) Why can't I find NetGuard in the Google Play™ store app?**
 
-NetGuard requires at least Android 4.0, so it is not available in the Google Play™ store app on devices running prior Android versions.
+NetGuard requires at least Android 5.1, so it is not available in the Google Play™ store app on devices running prior Android versions.
 
 <a name="FAQ19"></a>
 **(19) Why does application XYZ still have internet access?**
@@ -397,6 +396,7 @@ See [here](http://forum.xda-developers.com/showpost.php?p=67892427&postcount=303
 
 On most devices, NetGuard will keep running in the background with its foreground service.
 On some devices (in particular some Samsung models), where there are lots of applications competing for memory, Android may still stop NetGuard as a last resort.
+Some Android versions, in particular of Huawei (see [here](https://www.forbes.com/sites/bensin/2016/07/04/push-notifications-not-coming-through-to-your-huawei-phone-heres-how-to-fix-it/) for a fix) or Xiaomi (see [here](https://www.forbes.com/sites/bensin/2016/11/17/how-to-fix-push-notifications-on-xiaomis-miui-8-for-real/) for a fix) stop apps and services too aggressively.
 Unfortunately this cannot be fixed by NetGuard, and can be considered a shortcoming of the device and/or as a bug in Android.
 You can workaround this problem by enabling the watchdog in the NetGuard advanced options to check every 10-15 minutes.
 
@@ -448,6 +448,8 @@ Access to domain names shown in the application access log (drill down in the Ne
 even if you just enabled notify on access.
 To get notified for all domain names again, you can clear the application access log using the trashcan icon.
 If you want to clear all applications logs, you can export and import your settings.
+
+Another reason why you don't get notifications could be an applied "Power Saving Mode" for example on Samsung devices. Even if you do not restrict CPU frequency in this mode.
 
 <a name="FAQ45"></a>
 **(45) Does NetGuard handle incoming connections?**
@@ -515,8 +517,11 @@ and that Android allows NetGuard to use the internet in the background (see also
 
 Make sure you are not running NetGuard in allow (whitelist) mode (check the NetGuard default settings).
 
+Make sure you didn't enable the Always-On VPN setting '*Block connections without VPN*' (Android 8 Oreo or later).
+This will block resolving domain names too (is it a bug or feature?).
+
 Some Android versions contain a bug resulting in all internet traffic being blocked.
-Mostly, you can workaround this bug by enabling filtering in NetGuard's *Advamced options*.
+Mostly, you can workaround this bug by enabling filtering in NetGuard's *Advanced options*.
 
 <a name="FAQ52"></a>
 **(52) What is lockdown mode?**

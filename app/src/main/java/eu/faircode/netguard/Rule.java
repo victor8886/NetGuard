@@ -16,21 +16,19 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.XmlResourceParser;
-import android.net.Uri;
+import android.database.Cursor;
 import android.os.Build;
 import android.os.Process;
 import android.preference.PreferenceManager;
-import android.provider.Settings;
 import android.util.Log;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -48,15 +46,14 @@ import java.util.Map;
 public class Rule {
     private static final String TAG = "NetGuard.Rule";
 
-    public PackageInfo info;
+    public int uid;
+    public String packageName;
+    public int icon;
     public String name;
-    public String description;
+    public String version;
     public boolean system;
     public boolean internet;
     public boolean enabled;
-    public Intent launch;
-    public Intent settings;
-    public Intent datasaver;
     public boolean pkg = true;
 
     public boolean wifi_default = false;
@@ -85,14 +82,9 @@ public class Rule {
 
     private static List<PackageInfo> cachePackageInfo = null;
     private static Map<PackageInfo, String> cacheLabel = new HashMap<>();
-    private static Map<PackageInfo, String> cacheDescription = new HashMap<>();
     private static Map<String, Boolean> cacheSystem = new HashMap<>();
     private static Map<String, Boolean> cacheInternet = new HashMap<>();
     private static Map<PackageInfo, Boolean> cacheEnabled = new HashMap<>();
-    private static Map<String, Intent> cacheIntentLaunch = new HashMap<>();
-    private static Map<String, Intent> cacheIntentSettings = new HashMap<>();
-    private static Map<String, Intent> cacheIntentDatasaver = new HashMap<>();
-    private static Map<Integer, String[]> cachePackages = new HashMap<>();
 
     private static List<PackageInfo> getPackages(Context context) {
         if (cachePackageInfo == null) {
@@ -108,15 +100,6 @@ public class Rule {
             cacheLabel.put(info, info.applicationInfo.loadLabel(pm).toString());
         }
         return cacheLabel.get(info);
-    }
-
-    private static String getDescription(PackageInfo info, Context context) {
-        if (!cacheDescription.containsKey(info)) {
-            PackageManager pm = context.getPackageManager();
-            CharSequence description = info.applicationInfo.loadDescription(pm);
-            cacheDescription.put(info, description == null ? null : description.toString());
-        }
-        return cacheDescription.get(info);
     }
 
     private static boolean isSystem(String packageName, Context context) {
@@ -137,101 +120,70 @@ public class Rule {
         return cacheEnabled.get(info);
     }
 
-    private static Intent getIntentLaunch(String packageName, Context context) {
-        if (!cacheIntentLaunch.containsKey(packageName))
-            cacheIntentLaunch.put(packageName, context.getPackageManager().getLaunchIntentForPackage(packageName));
-        return cacheIntentLaunch.get(packageName);
-    }
-
-    private static Intent getIntentSettings(String packageName, Context context) {
-        if (!cacheIntentSettings.containsKey(packageName)) {
-            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(Uri.parse("package:" + packageName));
-            if (intent.resolveActivity(context.getPackageManager()) == null)
-                intent = null;
-            cacheIntentSettings.put(packageName, intent);
-        }
-        return cacheIntentSettings.get(packageName);
-    }
-
-    private static Intent getIntentDatasaver(String packageName, Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            if (!cacheIntentDatasaver.containsKey(packageName)) {
-                Intent intent = new Intent(
-                        Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS,
-                        Uri.parse("package:" + packageName));
-                if (intent.resolveActivity(context.getPackageManager()) == null)
-                    intent = null;
-                cacheIntentDatasaver.put(packageName, intent);
-            }
-            return cacheIntentDatasaver.get(packageName);
-        } else
-            return null;
-    }
-
-    private static String[] getPackages(int uid, Context context) {
-        if (!cachePackages.containsKey(uid))
-            cachePackages.put(uid, context.getPackageManager().getPackagesForUid(uid));
-        return cachePackages.get(uid);
-    }
-
     public static void clearCache(Context context) {
         Log.i(TAG, "Clearing cache");
         synchronized (context.getApplicationContext()) {
             cachePackageInfo = null;
             cacheLabel.clear();
-            cacheDescription.clear();
             cacheSystem.clear();
             cacheInternet.clear();
             cacheEnabled.clear();
-            cacheIntentLaunch.clear();
-            cacheIntentSettings.clear();
-            cacheIntentDatasaver.clear();
-            cachePackages.clear();
         }
+
+        DatabaseHelper dh = DatabaseHelper.getInstance(context);
+        dh.clearApps();
     }
 
-    private Rule(PackageInfo info, Context context) {
-        this.info = info;
+    private Rule(DatabaseHelper dh, PackageInfo info, Context context) {
+        this.uid = info.applicationInfo.uid;
+        this.packageName = info.packageName;
+        this.icon = info.applicationInfo.icon;
+        this.version = info.versionName;
         if (info.applicationInfo.uid == 0) {
             this.name = context.getString(R.string.title_root);
-            this.description = null;
             this.system = true;
             this.internet = true;
             this.enabled = true;
-            this.launch = null;
-            this.settings = null;
-            this.datasaver = null;
             this.pkg = false;
         } else if (info.applicationInfo.uid == 1013) {
             this.name = context.getString(R.string.title_mediaserver);
-            this.description = null;
             this.system = true;
             this.internet = true;
             this.enabled = true;
-            this.launch = null;
-            this.settings = null;
-            this.datasaver = null;
+            this.pkg = false;
+        } else if (info.applicationInfo.uid == 1021) {
+            this.name = context.getString(R.string.title_gpsdaemon);
+            this.system = true;
+            this.internet = true;
+            this.enabled = true;
             this.pkg = false;
         } else if (info.applicationInfo.uid == 9999) {
             this.name = context.getString(R.string.title_nobody);
-            this.description = null;
             this.system = true;
             this.internet = true;
             this.enabled = true;
-            this.launch = null;
-            this.settings = null;
-            this.datasaver = null;
             this.pkg = false;
         } else {
-            this.name = getLabel(info, context);
-            this.description = getDescription(info, context);
-            this.system = isSystem(info.packageName, context);
-            this.internet = hasInternet(info.packageName, context);
-            this.enabled = isEnabled(info, context);
-            this.launch = getIntentLaunch(info.packageName, context);
-            this.settings = getIntentSettings(info.packageName, context);
-            this.datasaver = getIntentDatasaver(info.packageName, context);
+            Cursor cursor = null;
+            try {
+                cursor = dh.getApp(this.packageName);
+                if (cursor.moveToNext()) {
+                    this.name = cursor.getString(cursor.getColumnIndex("label"));
+                    this.system = cursor.getInt(cursor.getColumnIndex("system")) > 0;
+                    this.internet = cursor.getInt(cursor.getColumnIndex("internet")) > 0;
+                    this.enabled = cursor.getInt(cursor.getColumnIndex("enabled")) > 0;
+                } else {
+                    this.name = getLabel(info, context);
+                    this.system = isSystem(info.packageName, context);
+                    this.internet = hasInternet(info.packageName, context);
+                    this.enabled = isEnabled(info, context);
+
+                    dh.addApp(this.packageName, this.name, this.system, this.internet, this.enabled);
+                }
+            } finally {
+                if (cursor != null)
+                    cursor.close();
+            }
         }
     }
 
@@ -329,6 +281,16 @@ public class Rule {
             media.applicationInfo.icon = 0;
             listPI.add(media);
 
+            // Add GPS daemon
+            PackageInfo gps = new PackageInfo();
+            gps.packageName = "android.gps";
+            gps.versionCode = Build.VERSION.SDK_INT;
+            gps.versionName = Build.VERSION.RELEASE;
+            gps.applicationInfo = new ApplicationInfo();
+            gps.applicationInfo.uid = 1021;
+            gps.applicationInfo.icon = 0;
+            listPI.add(gps);
+
             // Add nobody
             PackageInfo nobody = new PackageInfo();
             nobody.packageName = "nobody";
@@ -342,7 +304,11 @@ public class Rule {
             DatabaseHelper dh = DatabaseHelper.getInstance(context);
             for (PackageInfo info : listPI)
                 try {
-                    Rule rule = new Rule(info, context);
+                    // Skip self
+                    if (info.applicationInfo.uid == Process.myUid())
+                        continue;
+
+                    Rule rule = new Rule(dh, info, context);
 
                     if (pre_system.containsKey(info.packageName))
                         rule.system = pre_system.get(info.packageName);
@@ -374,15 +340,14 @@ public class Rule {
                         List<String> listPkg = new ArrayList<>();
                         if (pre_related.containsKey(info.packageName))
                             listPkg.addAll(Arrays.asList(pre_related.get(info.packageName)));
-                        String[] pkgs = getPackages(info.applicationInfo.uid, context);
-                        if (pkgs != null && pkgs.length > 1) {
-                            rule.relateduids = true;
-                            listPkg.addAll(Arrays.asList(pkgs));
-                            listPkg.remove(info.packageName);
-                        }
+                        for (PackageInfo pi : listPI)
+                            if (pi.applicationInfo.uid == rule.uid && !pi.packageName.equals(rule.packageName)) {
+                                rule.relateduids = true;
+                                listPkg.add(pi.packageName);
+                            }
                         rule.related = listPkg.toArray(new String[0]);
 
-                        rule.hosts = dh.getHostCount(rule.info.applicationInfo.uid, true);
+                        rule.hosts = dh.getHostCount(rule.uid, true);
 
                         rule.updateChanged(default_wifi, default_other, default_roaming);
 
@@ -392,22 +357,22 @@ public class Rule {
                     Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
                 }
 
+            // Sort rule list
             final Collator collator = Collator.getInstance(Locale.getDefault());
             collator.setStrength(Collator.SECONDARY); // Case insensitive, process accents etc
 
-            // Sort rule list
             String sort = prefs.getString("sort", "name");
             if ("uid".equals(sort))
                 Collections.sort(listRules, new Comparator<Rule>() {
                     @Override
                     public int compare(Rule rule, Rule other) {
-                        if (rule.info.applicationInfo.uid < other.info.applicationInfo.uid)
+                        if (rule.uid < other.uid)
                             return -1;
-                        else if (rule.info.applicationInfo.uid > other.info.applicationInfo.uid)
+                        else if (rule.uid > other.uid)
                             return 1;
                         else {
                             int i = collator.compare(rule.name, other.name);
-                            return (i == 0 ? rule.info.packageName.compareTo(other.info.packageName) : i);
+                            return (i == 0 ? rule.packageName.compareTo(other.packageName) : i);
                         }
                     }
                 });
@@ -417,7 +382,7 @@ public class Rule {
                     public int compare(Rule rule, Rule other) {
                         if (all || rule.changed == other.changed) {
                             int i = collator.compare(rule.name, other.name);
-                            return (i == 0 ? rule.info.packageName.compareTo(other.info.packageName) : i);
+                            return (i == 0 ? rule.packageName.compareTo(other.packageName) : i);
                         }
                         return (rule.changed ? -1 : 1);
                     }

@@ -1,10 +1,12 @@
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -19,6 +21,8 @@
 
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/in6.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/udp.h>
@@ -31,7 +35,6 @@
 
 #define TAG "NetGuard.JNI"
 
-// #define PROFILE_UID 5
 // #define PROFILE_JNI 5
 
 #define EPOLL_TIMEOUT 3600 // seconds
@@ -49,14 +52,16 @@
 #define UDP_TIMEOUT_ANY 300 // seconds
 #define UDP_KEEP_TIMEOUT 60 // seconds
 
-#define TCP_INIT_TIMEOUT 30 // seconds ~net.inet.tcp.keepinit
+#define TCP_INIT_TIMEOUT 20 // seconds ~net.inet.tcp.keepinit
 #define TCP_IDLE_TIMEOUT 3600 // seconds ~net.inet.tcp.keepidle
-#define TCP_CLOSE_TIMEOUT 30 // seconds
+#define TCP_CLOSE_TIMEOUT 20 // seconds
 #define TCP_KEEP_TIMEOUT 300 // seconds
 // https://en.wikipedia.org/wiki/Maximum_segment_lifetime
 
-#define SESSION_MAX 768 // number
-#define SESSION_LIMIT 40 // percent
+#define SESSION_MAX 384 // number
+#define SESSION_LIMIT 30 // percent
+
+#define UID_MAX_AGE 30000 // milliseconds
 
 #define SOCKS5_NONE 1
 #define SOCKS5_HELLO 2
@@ -64,12 +69,21 @@
 #define SOCKS5_CONNECT 4
 #define SOCKS5_CONNECTED 5
 
+struct context {
+    pthread_mutex_t lock;
+    int pipefds[2];
+    int stopping;
+    int sdk;
+    struct ng_session *ng_session;
+};
+
 struct arguments {
     JNIEnv *env;
     jobject instance;
     int tun;
     jboolean fwd53;
     jint rcode;
+    struct context *ctx;
 };
 
 struct allowed {
@@ -185,6 +199,17 @@ struct ng_session {
     struct ng_session *next;
 };
 
+struct uid_cache_entry {
+    uint8_t version;
+    uint8_t protocol;
+    uint8_t saddr[16];
+    uint16_t sport;
+    uint8_t daddr[16];
+    uint16_t dport;
+    jint uid;
+    long time;
+};
+
 // IPv6
 
 struct ip6_hdr_pseudo {
@@ -210,14 +235,14 @@ typedef struct pcap_hdr_s {
     guint32_t sigfigs;
     guint32_t snaplen;
     guint32_t network;
-} __packed;
+} __packed pcap_hdr_s;
 
 typedef struct pcaprec_hdr_s {
     guint32_t ts_sec;
     guint32_t ts_usec;
     guint32_t incl_len;
     guint32_t orig_len;
-} __packed;
+} __packed pcaprec_hdr_s;
 
 #define LINKTYPE_RAW 101
 
@@ -269,7 +294,7 @@ typedef struct dns_rr {
     __be16 qclass;
     __be32 ttl;
     __be16 rdlength;
-} __packed;
+} __packed dns_rr;
 
 // DHCP
 
@@ -291,12 +316,12 @@ typedef struct dhcp_packet {
     uint8_t sname[64];
     uint8_t file[128];
     uint32_t option_format;
-} __packed;
+} __packed dhcp_packet;
 
 typedef struct dhcp_option {
     uint8_t code;
     uint8_t length;
-} __packed;
+} __packed dhcp_option;
 
 // Prototypes
 
@@ -310,9 +335,7 @@ void report_error(const struct arguments *args, jint error, const char *fmt, ...
 
 void check_allowed(const struct arguments *args);
 
-void init(const struct arguments *args);
-
-void clear();
+void clear(struct context *ctx);
 
 int check_icmp_session(const struct arguments *args,
                        struct ng_session *s,
@@ -457,7 +480,9 @@ jint get_uid(const int version, const int protocol,
 
 jint get_uid_sub(const int version, const int protocol,
                  const void *saddr, const uint16_t sport,
-                 const void *daddr, const uint16_t dport);
+                 const void *daddr, const uint16_t dport,
+                 const char *source, const char *dest,
+                 long now);
 
 int protect_socket(const struct arguments *args, int socket);
 

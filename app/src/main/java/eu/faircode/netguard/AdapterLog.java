@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.content.Context;
@@ -24,14 +24,10 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v4.view.ViewCompat;
@@ -45,13 +41,10 @@ import android.widget.CursorAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.squareup.picasso.Picasso;
-
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionException;
 
 public class AdapterLog extends CursorAdapter {
     private static String TAG = "NetGuard.Log";
@@ -222,34 +215,14 @@ public class AdapterLog extends CursorAdapter {
         if (info == null)
             ivIcon.setImageDrawable(null);
         else {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                Icon icon;
-                if (info.icon == 0)
-                    icon = Icon.createWithResource(context, android.R.drawable.sym_def_app_icon);
-                else
-                    icon = Icon.createWithResource(info.packageName, info.icon);
-                try {
-                    icon.loadDrawableAsync(context, new Icon.OnDrawableLoadedListener() {
-                        @Override
-                        public void onDrawableLoaded(Drawable drawable) {
-                            if (drawable instanceof BitmapDrawable) {
-                                Bitmap original = ((BitmapDrawable) drawable).getBitmap();
-                                Bitmap scaled = Bitmap.createScaledBitmap(original, iconSize, iconSize, false);
-                                ivIcon.setImageDrawable(new BitmapDrawable(context.getResources(), scaled));
-                            } else
-                                ivIcon.setImageDrawable(drawable);
-                        }
-                    }, new Handler(context.getMainLooper()));
-                } catch (RejectedExecutionException ex) {
-                    Log.w(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-                }
-            } else {
-                if (info.icon == 0)
-                    Picasso.with(context).load(android.R.drawable.sym_def_app_icon).into(ivIcon);
-                else {
-                    Uri uri = Uri.parse("android.resource://" + info.packageName + "/" + info.icon);
-                    Picasso.with(context).load(uri).resize(iconSize, iconSize).into(ivIcon);
-                }
+            if (info.icon <= 0)
+                ivIcon.setImageResource(android.R.drawable.sym_def_app_icon);
+            else {
+                Uri uri = Uri.parse("android.resource://" + info.packageName + "/" + info.icon);
+                GlideApp.with(context)
+                        .load(uri)
+                        .override(iconSize, iconSize)
+                        .into(ivIcon);
             }
         }
 

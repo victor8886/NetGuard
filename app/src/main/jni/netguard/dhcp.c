@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 #include "netguard.h"
@@ -56,7 +56,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
         struct dhcp_packet *response = calloc(500, 1);
 
         // Hack
-        inet_pton(AF_INET, "10.1.10.1", &u->saddr);
+        inet_pton(AF_INET, "10.1.10.1", (void *) &u->saddr);
 
         /*
         Discover:

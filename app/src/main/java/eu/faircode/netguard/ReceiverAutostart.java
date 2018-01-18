@@ -16,7 +16,7 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.content.BroadcastReceiver;
@@ -29,7 +29,7 @@ import android.util.Log;
 
 import java.util.Map;
 
-public class Receiver extends BroadcastReceiver {
+public class ReceiverAutostart extends BroadcastReceiver {
     private static final String TAG = "NetGuard.Receiver";
 
     @Override

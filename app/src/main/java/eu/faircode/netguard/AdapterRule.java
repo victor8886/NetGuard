@@ -16,27 +16,25 @@ package eu.faircode.netguard;
     You should have received a copy of the GNU General Public License
     along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2015-2017 by Marcel Bokhorst (M66B)
+    Copyright 2015-2018 by Marcel Bokhorst (M66B)
 */
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.TypedArray;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.ContextCompat;
@@ -71,12 +69,9 @@ import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import com.squareup.picasso.Picasso;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionException;
 
 public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> implements Filterable {
     private static final String TAG = "NetGuard.Adapter";
@@ -120,13 +115,11 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         public TextView tvUid;
         public TextView tvPackage;
         public TextView tvVersion;
-        public TextView tvDescription;
         public TextView tvInternet;
         public TextView tvDisabled;
 
         public Button btnRelated;
         public ImageButton ibSettings;
-        public ImageButton ibDatasaver;
         public ImageButton ibLaunch;
 
         public CheckBox cbApply;
@@ -179,13 +172,11 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
             tvUid = itemView.findViewById(R.id.tvUid);
             tvPackage = itemView.findViewById(R.id.tvPackage);
             tvVersion = itemView.findViewById(R.id.tvVersion);
-            tvDescription = itemView.findViewById(R.id.tvDescription);
             tvInternet = itemView.findViewById(R.id.tvInternet);
             tvDisabled = itemView.findViewById(R.id.tvDisabled);
 
             btnRelated = itemView.findViewById(R.id.btnRelated);
             ibSettings = itemView.findViewById(R.id.ibSettings);
-            ibDatasaver = itemView.findViewById(R.id.ibDatasaver);
             ibLaunch = itemView.findViewById(R.id.ibLaunch);
 
             cbApply = itemView.findViewById(R.id.cbApply);
@@ -339,38 +330,14 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         holder.ivExpander.setImageLevel(rule.expanded ? 1 : 0);
 
         // Show application icon
-        if (rule.info.applicationInfo == null)
-            holder.ivIcon.setImageDrawable(null);
+        if (rule.icon <= 0)
+            holder.ivIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         else {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                final Icon icon;
-                if (rule.info.applicationInfo.icon == 0)
-                    icon = Icon.createWithResource(context, android.R.drawable.sym_def_app_icon);
-                else
-                    icon = Icon.createWithResource(rule.info.packageName, rule.info.applicationInfo.icon);
-                try {
-                    icon.loadDrawableAsync(context, new Icon.OnDrawableLoadedListener() {
-                        @Override
-                        public void onDrawableLoaded(Drawable drawable) {
-                            if (drawable instanceof BitmapDrawable) {
-                                Bitmap original = ((BitmapDrawable) drawable).getBitmap();
-                                Bitmap scaled = Bitmap.createScaledBitmap(original, iconSize, iconSize, false);
-                                holder.ivIcon.setImageDrawable(new BitmapDrawable(context.getResources(), scaled));
-                            } else
-                                holder.ivIcon.setImageDrawable(drawable);
-                        }
-                    }, new Handler(context.getMainLooper()));
-                } catch (RejectedExecutionException ex) {
-                    Log.w(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-                }
-            } else {
-                if (rule.info.applicationInfo.icon == 0)
-                    Picasso.with(context).load(android.R.drawable.sym_def_app_icon).into(holder.ivIcon);
-                else {
-                    Uri uri = Uri.parse("android.resource://" + rule.info.packageName + "/" + rule.info.applicationInfo.icon);
-                    Picasso.with(context).load(uri).resize(iconSize, iconSize).into(holder.ivIcon);
-                }
-            }
+            Uri uri = Uri.parse("android.resource://" + rule.packageName + "/" + rule.icon);
+            GlideApp.with(context)
+                    .load(uri)
+                    .override(iconSize, iconSize)
+                    .into(holder.ivIcon);
         }
 
         // Show application label
@@ -459,11 +426,9 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         holder.llConfiguration.setVisibility(rule.expanded ? View.VISIBLE : View.GONE);
 
         // Show application details
-        holder.tvUid.setText(rule.info.applicationInfo == null ? "?" : Integer.toString(rule.info.applicationInfo.uid));
-        holder.tvPackage.setText(rule.info.packageName);
-        holder.tvVersion.setText(rule.info.versionName + '/' + rule.info.versionCode);
-        holder.tvDescription.setVisibility(rule.description == null ? View.GONE : View.VISIBLE);
-        holder.tvDescription.setText(rule.description);
+        holder.tvUid.setText(Integer.toString(rule.uid));
+        holder.tvPackage.setText(rule.packageName);
+        holder.tvVersion.setText(rule.version);
 
         // Show application state
         holder.tvInternet.setVisibility(rule.internet ? View.GONE : View.VISIBLE);
@@ -475,38 +440,43 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
             @Override
             public void onClick(View view) {
                 Intent main = new Intent(context, ActivityMain.class);
-                main.putExtra(ActivityMain.EXTRA_SEARCH, Integer.toString(rule.info.applicationInfo.uid));
+                main.putExtra(ActivityMain.EXTRA_SEARCH, Integer.toString(rule.uid));
                 main.putExtra(ActivityMain.EXTRA_RELATED, true);
                 context.startActivity(main);
             }
         });
 
         // Launch application settings
-        holder.ibSettings.setVisibility(rule.settings == null ? View.GONE : View.VISIBLE);
-        holder.ibSettings.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                context.startActivity(rule.settings);
-            }
-        });
+        if (rule.expanded) {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + rule.packageName));
+            final Intent settings = (intent.resolveActivity(context.getPackageManager()) == null ? null : intent);
 
-        // Data saver
-        holder.ibDatasaver.setVisibility(rule.datasaver == null ? View.GONE : View.VISIBLE);
-        holder.ibDatasaver.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                context.startActivity(rule.datasaver);
-            }
-        });
+            holder.ibSettings.setVisibility(settings == null ? View.GONE : View.VISIBLE);
+            holder.ibSettings.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    context.startActivity(settings);
+                }
+            });
+        } else
+            holder.ibSettings.setVisibility(View.GONE);
 
         // Launch application
-        holder.ibLaunch.setVisibility(rule.launch == null ? View.GONE : View.VISIBLE);
-        holder.ibLaunch.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                context.startActivity(rule.launch);
-            }
-        });
+        if (rule.expanded) {
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(rule.packageName);
+            final Intent launch = (intent == null ||
+                    intent.resolveActivity(context.getPackageManager()) == null ? null : intent);
+
+            holder.ibLaunch.setVisibility(launch == null ? View.GONE : View.VISIBLE);
+            holder.ibLaunch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    context.startActivity(launch);
+                }
+            });
+        } else
+            holder.ibLaunch.setVisibility(View.GONE);
 
         // Apply
         holder.cbApply.setEnabled(rule.pkg);
@@ -693,7 +663,7 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         if (rule.expanded) {
             // Access the database when expanded only
             final AdapterAccess badapter = new AdapterAccess(context,
-                    DatabaseHelper.getInstance(context).getAccess(rule.info.applicationInfo.uid, rule.info.firstInstallTime));
+                    DatabaseHelper.getInstance(context).getAccess(rule.uid));
             holder.lvAccess.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, final int bposition, long bid) {
@@ -788,13 +758,19 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
                                     ServiceSinkhole.reload("reset host", context, false);
                                     result = true;
                                     break;
+
+                                case R.id.menu_copy:
+                                    ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                                    ClipData clip = ClipData.newPlainText("netguard", daddr);
+                                    clipboard.setPrimaryClip(clip);
+                                    return true;
                             }
 
                             if (menu == R.id.menu_allow || menu == R.id.menu_block || menu == R.id.menu_reset)
                                 new AsyncTask<Object, Object, Long>() {
                                     @Override
                                     protected Long doInBackground(Object... objects) {
-                                        return DatabaseHelper.getInstance(context).getHostCount(rule.info.applicationInfo.uid, false);
+                                        return DatabaseHelper.getInstance(context).getHostCount(rule.uid, false);
                                     }
 
                                     @Override
@@ -830,7 +806,7 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
                 Util.areYouSure(view.getContext(), R.string.msg_reset_access, new Util.DoubtListener() {
                     @Override
                     public void onSure() {
-                        DatabaseHelper.getInstance(context).clearAccess(rule.info.applicationInfo.uid, true);
+                        DatabaseHelper.getInstance(context).clearAccess(rule.uid, true);
                         if (!live)
                             notifyDataSetChanged();
                         if (rv != null)
@@ -886,44 +862,44 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         SharedPreferences notify = context.getSharedPreferences("notify", Context.MODE_PRIVATE);
 
         if (rule.wifi_blocked == rule.wifi_default)
-            wifi.edit().remove(rule.info.packageName).apply();
+            wifi.edit().remove(rule.packageName).apply();
         else
-            wifi.edit().putBoolean(rule.info.packageName, rule.wifi_blocked).apply();
+            wifi.edit().putBoolean(rule.packageName, rule.wifi_blocked).apply();
 
         if (rule.other_blocked == rule.other_default)
-            other.edit().remove(rule.info.packageName).apply();
+            other.edit().remove(rule.packageName).apply();
         else
-            other.edit().putBoolean(rule.info.packageName, rule.other_blocked).apply();
+            other.edit().putBoolean(rule.packageName, rule.other_blocked).apply();
 
         if (rule.apply)
-            apply.edit().remove(rule.info.packageName).apply();
+            apply.edit().remove(rule.packageName).apply();
         else
-            apply.edit().putBoolean(rule.info.packageName, rule.apply).apply();
+            apply.edit().putBoolean(rule.packageName, rule.apply).apply();
 
         if (rule.screen_wifi == rule.screen_wifi_default)
-            screen_wifi.edit().remove(rule.info.packageName).apply();
+            screen_wifi.edit().remove(rule.packageName).apply();
         else
-            screen_wifi.edit().putBoolean(rule.info.packageName, rule.screen_wifi).apply();
+            screen_wifi.edit().putBoolean(rule.packageName, rule.screen_wifi).apply();
 
         if (rule.screen_other == rule.screen_other_default)
-            screen_other.edit().remove(rule.info.packageName).apply();
+            screen_other.edit().remove(rule.packageName).apply();
         else
-            screen_other.edit().putBoolean(rule.info.packageName, rule.screen_other).apply();
+            screen_other.edit().putBoolean(rule.packageName, rule.screen_other).apply();
 
         if (rule.roaming == rule.roaming_default)
-            roaming.edit().remove(rule.info.packageName).apply();
+            roaming.edit().remove(rule.packageName).apply();
         else
-            roaming.edit().putBoolean(rule.info.packageName, rule.roaming).apply();
+            roaming.edit().putBoolean(rule.packageName, rule.roaming).apply();
 
         if (rule.lockdown)
-            lockdown.edit().putBoolean(rule.info.packageName, rule.lockdown).apply();
+            lockdown.edit().putBoolean(rule.packageName, rule.lockdown).apply();
         else
-            lockdown.edit().remove(rule.info.packageName).apply();
+            lockdown.edit().remove(rule.packageName).apply();
 
         if (rule.notify)
-            notify.edit().remove(rule.info.packageName).apply();
+            notify.edit().remove(rule.packageName).apply();
         else
-            notify.edit().putBoolean(rule.info.packageName, rule.notify).apply();
+            notify.edit().putBoolean(rule.packageName, rule.notify).apply();
 
         rule.updateChanged(context);
         Log.i(TAG, "Updated " + rule);
@@ -931,7 +907,7 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
         List<Rule> listModified = new ArrayList<>();
         for (String pkg : rule.related) {
             for (Rule related : listAll)
-                if (related.info.packageName.equals(pkg)) {
+                if (related.packageName.equals(pkg)) {
                     related.wifi_blocked = rule.wifi_blocked;
                     related.other_blocked = rule.other_blocked;
                     related.apply = rule.apply;
@@ -953,7 +929,7 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
 
         if (root) {
             notifyDataSetChanged();
-            NotificationManagerCompat.from(context).cancel(rule.info.applicationInfo.uid);
+            NotificationManagerCompat.from(context).cancel(rule.uid);
             ServiceSinkhole.reload("rule changed", context, false);
         }
     }
@@ -975,8 +951,8 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
                         uid = -1;
                     }
                     for (Rule rule : listAll)
-                        if (rule.info.applicationInfo.uid == uid ||
-                                rule.info.packageName.toLowerCase().contains(query) ||
+                        if (rule.uid == uid ||
+                                rule.packageName.toLowerCase().contains(query) ||
                                 (rule.name != null && rule.name.toLowerCase().contains(query)))
                             listResult.add(rule);
                 }
@@ -1010,7 +986,7 @@ public class AdapterRule extends RecyclerView.Adapter<AdapterRule.ViewHolder> im
     @Override
     public long getItemId(int position) {
         Rule rule = listFiltered.get(position);
-        return rule.info.packageName.hashCode() * 100000L + rule.info.applicationInfo.uid;
+        return rule.packageName.hashCode() * 100000L + rule.uid;
     }
 
     @Override
